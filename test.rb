@@ -14,10 +14,10 @@ WORDS.each { |s| r << s }
 
 # print test words, internal state, and regex
 pp WORDS
-pp re.h
-pp re.to_s
+pp r.h
+pp r.to_s
 
 # test regex
-re = Regexp.new(re.to_s)
+re = Regexp.new(r.to_s)
 pp WORDS.all? { |s| re =~ s }
 
