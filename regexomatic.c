@@ -169,7 +169,7 @@ pool_fini(pool_t * const pool) {
 
 static bool
 pool_cmap_new(
-  pool_t * const pool, 
+  pool_t * const pool,
   cmap_t ** const cmap
 ) {
   if (!pool) {
@@ -404,7 +404,6 @@ ctx_write_cmap(
   // return success
   return true;
 }
-
 
 bool
 regexomatic_write(
