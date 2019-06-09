@@ -1,5 +1,4 @@
 #include <stdbool.h> // bool
-#include <stdint.h> // uint8_t
 #include <stdlib.h> // malloc()
 #include <stdio.h> // fopen()
 #include <errno.h> // errno, perror()
@@ -7,6 +6,7 @@
 #include <ctype.h> // isspace()
 #include <string.h> // strlen()
 #include <stdarg.h> // va_start
+#include "regexomatic.h"
 
 #define UNUSED(a) ((void) (a))
 
@@ -94,16 +94,16 @@ typedef struct {
   pool_slab_t *root;
 } pool_t;
 
-typedef struct {
+struct regexomatic_t_ {
   pool_t pool;
   cmap_t *root;
   void (*on_error)(const char *, void *);
   void *cb_data;
-} ctx_t;
+};
 
 static void
 ctx_die(
-  const ctx_t * const ctx,
+  const regexomatic_t * const ctx,
   const char * const fmt,
   ...
 ) {
@@ -195,13 +195,13 @@ pool_cmap_new(
   return true;
 }
 
-static ctx_t *
-ctx_init(
+regexomatic_t *
+regexomatic_init(
   void (*on_error)(const char *, void *),
   void *cb_data
 ) {
   // alloc context, check for error
-  ctx_t *ctx = calloc(1, sizeof(ctx_t));
+  regexomatic_t *ctx = calloc(1, sizeof(regexomatic_t));
   if (!ctx) {
     if (on_error) {
       // call error handler
@@ -237,60 +237,15 @@ ctx_init(
   return ctx;
 }
 
-static void
-ctx_fini(ctx_t * const ctx) {
+void
+regexomatic_fini(regexomatic_t * const ctx) {
   pool_fini(&(ctx->pool));
   free(ctx);
 }
 
-/* 
- * static void
- * read_words(
- *   const char * const path,
- *   bool (*word_cb)(const word_t *, void *),
- *   void * const cb_data
- * ) {
- *   char buf[1024];
- * 
- *   // open input file
- *   FILE *fh = fopen(path, "rb");
- *   if (!fh) {
- *     // print error, exit with failure
- *     err(EXIT_FAILURE, "fopen(\"%s\")", path);
- *   }
- * 
- *   // read words
- *   while (fgets(buf, sizeof(buf), fh) && !feof(fh)) {
- *     // init word
- *     word_t word = {
- *       .ptr = buf,
- *       .len = strlen(buf),
- *     };
- * 
- *     // strip whitespace
- *     if (!word_strip(&word)) {
- *       // print error, exit with failure
- *       errx(EXIT_FAILURE, "word_strip() failed");
- *     }
- * 
- *     // invoke callback
- *     if (word.len > 0 && word_cb && !word_cb(&word, cb_data)) {
- *       // print error, exit with failure
- *       errx(EXIT_FAILURE, "word callback failed");
- *     }
- *   }
- * 
- *   // close input file
- *   if (fclose(fh)) {
- *     // print warning, continue
- *     warn("fclose(\"%s\")", path);
- *   }
- * }
- */ 
-
-static bool
-ctx_add_word(
-  ctx_t * const ctx,
+bool
+regexomatic_add_word(
+  regexomatic_t * const ctx,
   const uint8_t * const buf,
   const size_t len
 ) {
@@ -319,9 +274,9 @@ ctx_add_word(
   return true;
 }
 
-static bool
-ctx_read(
-  ctx_t * const ctx,
+bool
+regexomatic_read(
+  regexomatic_t * const ctx,
   const char * const path
 ) {
   char buf[1024];
@@ -350,7 +305,7 @@ ctx_read(
     }
 
     // invoke callback
-    if (word.len > 0 && !ctx_add_word(ctx, (uint8_t*) word.ptr, word.len)) {
+    if (word.len > 0 && !regexomatic_add_word(ctx, (uint8_t*) word.ptr, word.len)) {
       // print error, exit with failure
       ctx_die(ctx, "ctx_add_word() failed");
       return false;
@@ -367,26 +322,9 @@ ctx_read(
   return true;
 }
 
-// static bool
-// on_word(
-//   const word_t * const word,
-//   void * const data
-// ) {
-//   ctx_t *ctx = data;
-//   return ctx_add_word(ctx, (uint8_t*) word->ptr, word->len);
-// }
-
-static void
-print_usage_and_exit(
-  const char * const app
-) {
-  fprintf(stderr, "Usage: %s words.txt\n", app);
-  exit(EXIT_FAILURE);
-}
-
 static bool
 ctx_write_byte(
-  ctx_t * const ctx,
+  regexomatic_t * const ctx,
   const uint8_t byte,
   bool (*on_write)(const uint8_t *, const size_t, void *),
   void *cb_data
@@ -397,7 +335,7 @@ ctx_write_byte(
 
 static bool
 ctx_write_buf(
-  ctx_t * const ctx,
+  regexomatic_t * const ctx,
   const uint8_t * const buf,
   const size_t len,
   bool (*on_write)(const uint8_t *, const size_t, void *),
@@ -409,7 +347,7 @@ ctx_write_buf(
 
 static bool
 ctx_write_cmap(
-  ctx_t * const ctx,
+  regexomatic_t * const ctx,
   const cmap_t * const cmap,
   bool (*on_write)(const uint8_t *, const size_t, void *),
   void *cb_data
@@ -468,9 +406,9 @@ ctx_write_cmap(
 }
 
 
-static bool
-ctx_write(
-  ctx_t * const ctx,
+bool
+regexomatic_write(
+  regexomatic_t * const ctx,
   bool (*on_write)(const uint8_t *, const size_t, void *),
   void *cb_data
 ) {
@@ -491,101 +429,4 @@ ctx_write(
 
   // return success
   return true;
-}
-
-// static void
-// cmap_write(
-//   const cmap_t * const cmap,
-//   FILE * const fh
-// ) {
-//   const size_t num_kids = cmap->num_kids;
-// 
-//   if (num_kids > 0) {
-//     if (num_kids > 1) {
-//       // write open paren
-//       if (fputs("(?:", fh) == EOF) {
-//         err(EXIT_FAILURE, "fputs()");
-//       }
-//     }
-// 
-//     // walk children and write each one
-//     for (size_t i = 0, num_out = 0; (num_out < num_kids) && (i < 256); i++) {
-//       if (!cmap->kids[i]) {
-//         continue;
-//       }
-// 
-//       if (num_out > 0) {
-//         // write delimiter
-//         if (fputc('|', fh) == EOF) {
-//           err(EXIT_FAILURE, "fputc()");
-//         }
-//       }
-// 
-//       // write byte (TODO: escape me)
-//       if (fputc(i, fh) == EOF) {
-//         err(EXIT_FAILURE, "fputc()");
-//       }
-// 
-//       // write cmap
-//       cmap_write(cmap->kids[i], fh);
-// 
-//       // increment output count
-//       num_out++;
-//     }
-// 
-//     if (num_kids > 1) {
-//       // write close paren
-//       if (fputs(")", fh) == EOF) {
-//         err(EXIT_FAILURE, "fputs()");
-//       }
-//     }
-//   }
-// }
-
-static void
-on_error(
-  const char * const err,
-  void *cb_data
-) {
-  UNUSED(cb_data);
-  fprintf(stderr, "ERROR: %s", err);
-  exit(EXIT_FAILURE);
-}
-
-static bool on_write(
-  const uint8_t * const buf,
-  const size_t len,
-  void *cb_data
-) {
-  FILE *fh = cb_data;
-  return fwrite(buf, len, 1, fh) != 0;
-}
-
-int main(int argc, char *argv[]) {
-  // check args
-  if (argc < 2) {
-    // print usage and exit
-    print_usage_and_exit(argv[0]);
-  }
-
-  // init context
-  ctx_t * const ctx = ctx_init(on_error, NULL);
-
-  // read words
-  if (!ctx_read(ctx, argv[1])) {
-    return EXIT_FAILURE;
-  }
-
-  // read words
-  // read_words(argv[1], on_word, ctx);
-
-  if (!ctx_write(ctx, on_write, stdout)) {
-    return EXIT_FAILURE;
-  }
-
-  // finalize context
-  ctx_fini(ctx);
-
-  // return success
-  return EXIT_SUCCESS;
 }

@@ -1,7 +1,10 @@
 #include <stdbool.h> // bool
-#include <stdio.h> // for fprintf()
+#include <stdlib.h> // exit();
+#include <stdio.h> // for fwrite(), fputs()
 #include <err.h> // err(), errx()
 #include "regexomatic.h" // for regexomatic_init()
+
+#define UNUSED(a) ((void) (a))
 
 static void
 on_error(
@@ -9,8 +12,7 @@ on_error(
   void *cb_data
 ) {
   UNUSED(cb_data);
-  fprintf(stderr, "ERROR: %s", err);
-  exit(EXIT_FAILURE);
+  errx(EXIT_FAILURE, "ERROR: %s", err);
 }
 
 static bool on_write(
@@ -26,8 +28,7 @@ static void
 print_usage_and_exit(
   const char * const app
 ) {
-  fprintf(stderr, "Usage: %s words.txt\n", app);
-  exit(EXIT_FAILURE);
+  errx(EXIT_FAILURE, "Usage: %s words.txt", app);
 }
 
 int main(int argc, char *argv[]) {
@@ -38,22 +39,23 @@ int main(int argc, char *argv[]) {
   }
 
   // init context
-  ctx_t * const ctx = ctx_init(on_error, NULL);
+  regexomatic_t * const ctx = regexomatic_init(on_error, NULL);
 
   // read words
-  if (!ctx_read(ctx, argv[1])) {
+  if (!regexomatic_read(ctx, argv[1])) {
     return EXIT_FAILURE;
   }
 
-  // read words
-  // read_words(argv[1], on_word, ctx);
-
-  if (!ctx_write(ctx, on_write, stdout)) {
+  // write to stdout
+  if (!regexomatic_write(ctx, on_write, stdout)) {
     return EXIT_FAILURE;
   }
+
+  // write trailing newline
+  fputs("\n", stdout);
 
   // finalize context
-  ctx_fini(ctx);
+  regexomatic_fini(ctx);
 
   // return success
   return EXIT_SUCCESS;

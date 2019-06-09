@@ -1,5 +1,5 @@
-CFLAGS=-O2 -W -Wall -Werror -pedantic -std=c99 -g
-OBJS=regexomatic.o
+CFLAGS=-O2 -W -Wall -Werror -pedantic -std=c11
+OBJS=regexomatic.o main.o
 APP=regexomatic
 
 .PHONY=all clean
