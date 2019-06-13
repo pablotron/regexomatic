@@ -6,6 +6,21 @@
 
 #define UNUSED(a) ((void) (a))
 
+/**
+ * print usage to stderr and exit with failure.
+ */
+static void
+print_usage_and_exit(
+  const char * const app
+) {
+  errx(EXIT_FAILURE, "Usage: %s words.txt", app);
+}
+
+/**
+ * error callback for regexomatic_init().
+ *
+ * print error to stderr and exit.
+ */
 static void
 on_error(
   const char * const err,
@@ -15,7 +30,13 @@ on_error(
   errx(EXIT_FAILURE, "ERROR: %s", err);
 }
 
-static bool on_write(
+/**
+ * write callback for regexomatic_write().
+ *
+ * print data to stdout.
+ */
+static bool
+on_write(
   const uint8_t * const buf,
   const size_t len,
   void *cb_data
@@ -24,12 +45,14 @@ static bool on_write(
   return fwrite(buf, len, 1, fh) != 0;
 }
 
-static void
-print_usage_and_exit(
-  const char * const app
-) {
-  errx(EXIT_FAILURE, "Usage: %s words.txt", app);
-}
+/**
+ * configuration for regexomatic_write().
+ */
+static const regexomatic_write_config_t
+WRITE_CONFIG = {
+  .syntax   = REGEXOMATIC_SYNTAX_RUBY,
+  .on_write = on_write,
+};
 
 int main(int argc, char *argv[]) {
   // check args
@@ -47,7 +70,7 @@ int main(int argc, char *argv[]) {
   }
 
   // write to stdout
-  if (!regexomatic_write(ctx, on_write, stdout)) {
+  if (!regexomatic_write(ctx, &WRITE_CONFIG, stdout)) {
     return EXIT_FAILURE;
   }
 
